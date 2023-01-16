@@ -66,7 +66,7 @@ mod first_set {
         let a = Bytes::from_str("this is a test");
         let b = Bytes::from_str("wokka wokka!!!");
         let expected_hamming_distance = 37;
-        let hamming_distance = hamming_distance(&a, &b);
+        let hamming_distance = hamming_distance(a.bytes(), b.bytes());
         assert!(expected_hamming_distance == hamming_distance);
     }
 
@@ -74,15 +74,17 @@ mod first_set {
     pub fn break_repeating_key_xor() {
         let encrypted = Bytes::from_base64_file("./6.txt");
         let mut key = Bytes::new();
-        let mut key_size = 29;
+        let key_size = 29;
         // Try KEYSIZE values between 2 and 40
         for i in 2..40 {
             let first_block = encrypted.block(0, i);
             let second_block = encrypted.block(i, 2 * i);
-            let third_block = encrypted.block(2 * i, 3 * i);
-            let fourth_block = encrypted.block(3 * i, 4 * i);
-            let first_score = hamming_distance(&first_block, &second_block) / (i as u32);
-            let second_score = hamming_distance(&first_block, &second_block) / (i as u32);
+            // let third_block = encrypted.block(2 * i, 3 * i);
+            // let fourth_block = encrypted.block(3 * i, 4 * i);
+            let first_score =
+                hamming_distance(first_block.bytes(), second_block.bytes()) / (i as u32);
+            let second_score =
+                hamming_distance(first_block.bytes(), second_block.bytes()) / (i as u32);
             let score = (first_score + second_score) / 2;
             dbg!(&score);
         }

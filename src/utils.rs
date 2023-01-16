@@ -1,10 +1,11 @@
 use base64::{engine::general_purpose, Engine as _};
 use hex;
+use rand::Rng;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
-use std::str;
+use std::{iter, str};
 
 #[derive(Debug, Clone)]
 pub struct Bytes(Vec<u8>);
@@ -12,6 +13,10 @@ pub struct Bytes(Vec<u8>);
 impl Bytes {
     pub fn from_hex(hex: &str) -> Self {
         Bytes(hex::decode(hex).unwrap())
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        self.0.as_slice()
     }
 
     pub fn new() -> Self {
@@ -146,9 +151,32 @@ where
     general_purpose::STANDARD.decode(content).unwrap()
 }
 
-pub fn hamming_distance(a: &Bytes, b: &Bytes) -> u32 {
-    let xored = a.xor(b);
-    xored.count_ones()
+pub fn hamming_distance(a: &[u8], b: &[u8]) -> u32 {
+    let xored = xor(a, b);
+    xored.iter().map(|byte| byte.count_ones()).sum()
+}
+
+pub fn random_bytes_16() -> Vec<u8> {
+    rand::thread_rng().gen::<[u8; 16]>().to_vec()
+}
+
+pub fn coin_flip() -> bool {
+    rand::thread_rng().gen::<bool>()
+}
+
+pub fn pad_to(bytes: &[u8], size: usize) -> Vec<u8> {
+    let mut res = bytes.to_vec();
+    let len = bytes.len();
+    if len < size {
+        res.extend::<Vec<u8>>(iter::repeat(b'\x04').take(size - len).collect());
+    }
+    res
+}
+
+pub fn random_bytes_range(min: usize, max: usize) -> Vec<u8> {
+    let bytes = random_bytes_16();
+    let num_bytes = rand::thread_rng().gen_range(min..max + 1);
+    bytes[0..num_bytes].to_vec()
 }
 
 pub fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
@@ -156,6 +184,10 @@ pub fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
         .zip(b.iter().cycle().take(b.len()))
         .map(|(&x1, &x2)| x1 ^ x2)
         .collect()
+}
+
+pub fn from_base64(input: &str) -> Vec<u8> {
+    general_purpose::STANDARD.decode(input).unwrap()
 }
 
 pub fn display(bytes: &[u8]) -> Option<&str> {
