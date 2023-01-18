@@ -28,7 +28,7 @@ pub fn aes_encrypt(data: &[u8], mode: AESMode, key: &[u8]) -> Vec<u8> {
         let mut block = GenericArray::from(slice);
         cipher.encrypt_block(&mut block);
         encrypted.extend(block);
-        iv_block = slice;
+        iv_block = block.into();
     }
     encrypted
 }
@@ -44,6 +44,8 @@ pub fn aes_decrypt(data: &[u8], mode: AESMode, key: &[u8]) -> Vec<u8> {
         cipher.decrypt_block(&mut block);
         let decrypted_block;
         if mode == AESMode::CBC {
+            dbg!(&display(&iv_block));
+            dbg!(&display(&block));
             decrypted_block = xor(&block, &iv_block);
         } else {
             decrypted_block = block.to_vec();

@@ -8,7 +8,7 @@ mod second_set {
         error::CryptoError,
         utils::{
             coin_flip, display, from_base64, hamming_distance, random_bytes_16, random_bytes_range,
-            read_base64_file,
+            read_base64_file, xor,
         },
     };
 
@@ -18,6 +18,14 @@ mod second_set {
         let key = b"YELLOW SUBMARINE";
         let decrypted = aes_decrypt(&ciphertext, AESMode::CBC, key);
         println!("Decrypted {:?}", display(&decrypted))
+    }
+
+    #[test]
+    pub fn cbc_test() {
+        let pt = b"aaaaaaaaaaaaaaaa";
+        let ct = aes_encrypt(pt, AESMode::CBC, &CONSTANT_KEY);
+        let decrypted = aes_decrypt(&ct, AESMode::CBC, &CONSTANT_KEY);
+        assert!(decrypted == pt);
     }
 
     #[test]
@@ -163,6 +171,20 @@ mod second_set {
             .to_string()
     }
 
+    pub fn strip_padding_bytes(pt: &[u8]) -> Result<String, CryptoError> {
+        let mut truncation_point = pt.len() - 1;
+        while truncation_point > 0 {
+            let char = pt[truncation_point];
+            if char > 19 {
+                break;
+            } else if char != 4 {
+                return Err(CryptoError("Invalid padding detected".into()));
+            }
+            truncation_point -= 1;
+        }
+        Ok(display(&pt[0..truncation_point + 1]).unwrap().to_string())
+    }
+
     pub fn strip_padding(pt: &str) -> Result<String, CryptoError> {
         let mut truncation_point = pt.len() - 1;
         let bytes = pt.as_bytes();
@@ -201,5 +223,35 @@ mod second_set {
         let altered_ciphertext = [&encrypted_profile[0..48], &encrypted_profile[16..32]].concat();
         let decrypted = decrypt_profile(&altered_ciphertext);
         kv_parse(&decrypted);
+    }
+
+    pub fn prepare_input(string: &str) -> Vec<u8> {
+        let mut input = string.replace(";", "';'").replace("=", "'='");
+        input = [
+            "comment1=cooking%20MCs;userdata=",
+            &input,
+            ";comment2=%20like%20a%20pound%20of%20bacon",
+        ]
+        .concat();
+        aes_encrypt(input.as_bytes(), AESMode::CBC, &CONSTANT_KEY)
+    }
+
+    pub fn has_admin(ciphertext: &[u8]) -> bool {
+        let plaintext = aes_decrypt(ciphertext, AESMode::CBC, &CONSTANT_KEY);
+        let decrypted = strip_padding_bytes(&plaintext).unwrap();
+        decrypted.contains(";admin=true")
+    }
+
+    #[test]
+    pub fn cbc_bitflipping_attacks() {
+        let ciphertext = prepare_input("whoops");
+        let target =
+            "comment1=cooking%20MCs;userdata=;whoops;comment2=%20like%20a%20pound%20of%20bacon";
+        let injected = ";admin=true;aaaa";
+        let mask = xor(&target.as_bytes()[16..32], injected.as_bytes());
+        let input = [xor(&mask, &ciphertext[0..16]), ciphertext[16..].to_vec()].concat();
+
+        let admin = has_admin(&input);
+        assert!(admin);
     }
 }

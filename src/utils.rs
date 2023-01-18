@@ -64,12 +64,8 @@ impl Bytes {
         Bytes(slice.to_vec())
     }
 
-    pub fn display(&self) -> Option<&str> {
-        if let Ok(string) = str::from_utf8(&self.0) {
-            return Some(string);
-        } else {
-            return None;
-        }
+    pub fn display(&self) -> Option<String> {
+        Some(String::from_utf8_lossy(&self.0).into())
     }
 
     pub fn from_base64_file<P>(filename: P) -> Self
@@ -189,11 +185,6 @@ pub fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
 pub fn from_base64(input: &str) -> Vec<u8> {
     general_purpose::STANDARD.decode(input).unwrap()
 }
-
-pub fn display(bytes: &[u8]) -> Option<&str> {
-    if let Ok(string) = str::from_utf8(bytes) {
-        return Some(string);
-    } else {
-        return None;
-    }
+pub fn display(input: &[u8]) -> Option<String> {
+    Some(String::from_utf8_lossy(input).into())
 }
