@@ -67,4 +67,7 @@ pub fn temper(num: u32) -> u32 {
     y
 }
 
-pub fn untemper(num: u32) -> u32 {}
+pub fn untemper(num: u32) -> u32 {
+    let mut y = num;
+    y
+}
