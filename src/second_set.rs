@@ -8,7 +8,7 @@ mod second_set {
         error::CryptoError,
         utils::{
             coin_flip, display, from_base64, hamming_distance, random_bytes_16, random_bytes_range,
-            read_base64_file, xor,
+            read_base64_file, strip_padding_bytes, xor,
         },
     };
 
@@ -167,52 +167,30 @@ mod second_set {
     pub fn decrypt_profile(ciphertext: &[u8]) -> String {
         let key = CONSTANT_KEY;
         display(&aes_decrypt(ciphertext, AESMode::EBC, &key))
-            .unwrap()
-            .to_string()
-    }
-
-    pub fn strip_padding_bytes(pt: &[u8]) -> Result<String, CryptoError> {
-        let mut truncation_point = pt.len() - 1;
-        while truncation_point > 0 {
-            let char = pt[truncation_point];
-            if char > 19 {
-                break;
-            } else if char != 4 {
-                return Err(CryptoError("Invalid padding detected".into()));
-            }
-            truncation_point -= 1;
-        }
-        Ok(display(&pt[0..truncation_point + 1]).unwrap().to_string())
-    }
-
-    pub fn strip_padding(pt: &str) -> Result<String, CryptoError> {
-        let mut truncation_point = pt.len() - 1;
-        let bytes = pt.as_bytes();
-        while truncation_point > 0 {
-            let char = bytes[truncation_point];
-            if char > 19 {
-                break;
-            } else if char != 4 {
-                return Err(CryptoError("Invalid padding detected".into()));
-            }
-            truncation_point -= 1;
-        }
-        Ok(display(&bytes[0..truncation_point + 1])
-            .unwrap()
-            .to_string())
     }
 
     #[test]
     pub fn padding_validation() {
-        let str1 = "ICE ICE BABY\x04\x04\x04\x04";
-        let str2 = "ICE ICE BABY\x05\x05\x05\x05";
-        let str3 = "ICE ICE BABY\x01\x02\x03\x04";
-        let res1 = strip_padding(str1);
-        let res2 = strip_padding(str2);
-        let res3 = strip_padding(str3);
-        assert!(res1 == Ok("ICE ICE BABY".into()));
-        assert!(res2 == Err(CryptoError("Invalid padding detected".into())));
-        assert!(res3 == Err(CryptoError("Invalid padding detected".into())));
+        let str1 = b"ICE ICE BABY\x04\x04\x04\x04";
+        let str2 = b"ICE ICE BABY\x05\x05\x05\x05";
+        let str3 = b"ICE ICE BABY\x01\x02\x03\x04";
+        let str4 = b"ICE ICE BABYAA\x02\x02";
+        let res1 = strip_padding_bytes(str1);
+        let res2 = strip_padding_bytes(str2);
+        let res3 = strip_padding_bytes(str3);
+        let res4 = strip_padding_bytes(str4);
+        assert!(res1 == Ok(b"ICE ICE BABY".to_vec()));
+        assert!(res4 == Ok(b"ICE ICE BABY".to_vec()));
+        assert!(
+            res2 == Err(CryptoError(
+                "Invalid padding detected, incorrect number of padding bytes".into()
+            ))
+        );
+        assert!(
+            res3 == Err(CryptoError(
+                "Invalid padding detected, padding inconsistent".into()
+            ))
+        );
     }
 
     #[test]
@@ -238,7 +216,7 @@ mod second_set {
 
     pub fn has_admin(ciphertext: &[u8]) -> bool {
         let plaintext = aes_decrypt(ciphertext, AESMode::CBC, &CONSTANT_KEY);
-        let decrypted = strip_padding_bytes(&plaintext).unwrap();
+        let decrypted = display(&strip_padding_bytes(&plaintext).unwrap());
         decrypted.contains(";admin=true")
     }
 

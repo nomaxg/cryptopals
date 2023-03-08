@@ -4,7 +4,7 @@ use aes::cipher::{generic_array::GenericArray, BlockDecrypt, KeyInit};
 use aes::Aes128;
 use std::convert::TryInto;
 
-use crate::utils::{display, pad_to, xor};
+use crate::utils::{pad_to, xor};
 
 #[derive(PartialEq, Debug)]
 pub enum AESMode {
@@ -44,8 +44,6 @@ pub fn aes_decrypt(data: &[u8], mode: AESMode, key: &[u8]) -> Vec<u8> {
         cipher.decrypt_block(&mut block);
         let decrypted_block;
         if mode == AESMode::CBC {
-            dbg!(&display(&iv_block));
-            dbg!(&display(&block));
             decrypted_block = xor(&block, &iv_block);
         } else {
             decrypted_block = block.to_vec();
@@ -54,4 +52,26 @@ pub fn aes_decrypt(data: &[u8], mode: AESMode, key: &[u8]) -> Vec<u8> {
         iv_block = next_iv;
     }
     decrypted
+}
+
+pub fn ctr_encrypt(data: &[u8], key: &[u8]) -> Vec<u8> {
+    ctr_stream(data, key)
+}
+
+pub fn ctr_decrypt(data: &[u8], key: &[u8]) -> Vec<u8> {
+    ctr_stream(data, key)
+}
+
+fn ctr_stream(data: &[u8], key: &[u8]) -> Vec<u8> {
+    let mut ctr_vec = [0; BLOCK_SIZE];
+    let mut output = vec![];
+    let mut ctr = 0;
+    for chunk in data.chunks(BLOCK_SIZE) {
+        ctr_vec[8] = ctr;
+        let mask = aes_encrypt(&ctr_vec, AESMode::EBC, key);
+        let xored = xor(&chunk, &mask);
+        output.extend(xored);
+        ctr += 1;
+    }
+    output
 }

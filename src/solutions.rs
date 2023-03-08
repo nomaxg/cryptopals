@@ -32,7 +32,9 @@ mod first_set {
     #[test]
     pub fn single_byte_xor() {
         let input = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
-        break_single_char_xor(&Bytes::from_hex(&input));
+        let hex = from_hex(&input);
+        let res = break_single_char_xor(&hex);
+        dbg!(display(&xor(&hex, &res)));
     }
 
     #[test]
@@ -41,15 +43,15 @@ mod first_set {
             // Consumes the iterator, returns an (Optional) String
             for line in lines {
                 if let Ok(ip) = line {
-                    let bytes = Bytes::from_hex(&ip);
-                    break_single_char_xor(&bytes);
+                    let hex = from_hex(&ip);
+                    let res = break_single_char_xor(&hex);
+                    dbg!(display(&xor(&hex, &res)));
                 }
             }
         } else {
             dbg!("couldn't find file");
         }
     }
-
     #[test]
     pub fn repeating_key_xor() {
         let key = "ICE";
@@ -72,30 +74,29 @@ mod first_set {
 
     #[test]
     pub fn break_repeating_key_xor() {
-        let encrypted = Bytes::from_base64_file("./6.txt");
-        let mut key = Bytes::new();
+        let encrypted = from_base64_file("./6.txt");
+        let mut key = vec![];
         let key_size = 29;
         // Try KEYSIZE values between 2 and 40
-        for i in 2..40 {
-            let first_block = encrypted.block(0, i);
-            let second_block = encrypted.block(i, 2 * i);
-            // let third_block = encrypted.block(2 * i, 3 * i);
-            // let fourth_block = encrypted.block(3 * i, 4 * i);
-            let first_score =
-                hamming_distance(first_block.bytes(), second_block.bytes()) / (i as u32);
-            let second_score =
-                hamming_distance(first_block.bytes(), second_block.bytes()) / (i as u32);
-            let score = (first_score + second_score) / 2;
-            dbg!(&score);
-        }
+        // for i in 2..40 {
+        //     let first_block = encrypted.block(0, i);
+        //     let second_block = encrypted.block(i, 2 * i);
+        //     // let third_block = encrypted.block(2 * i, 3 * i);
+        //     // let fourth_block = encrypted.block(3 * i, 4 * i);
+        //     let first_score =
+        //         hamming_distance(first_block.bytes(), second_block.bytes()) / (i as u32);
+        //     let second_score =
+        //         hamming_distance(first_block.bytes(), second_block.bytes()) / (i as u32);
+        //     let score = (first_score + second_score) / 2;
+        //     dbg!(&score);
+        // }
         for i in 0..key_size {
-            let transposed = encrypted.transpose(key_size, i);
+            let transposed = transpose(&encrypted, key_size, i);
             let block_key = break_single_char_xor(&transposed);
             key.extend(&block_key);
         }
-        dbg!(encrypted.xor(&key).display());
+        dbg!(display(&xor(&encrypted, &key)));
     }
-
     #[test]
     pub fn aes_ecb_mode() {
         let ciphertext = read_base64_file("./7.txt");

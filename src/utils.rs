@@ -7,6 +7,8 @@ use std::io::{self, BufRead};
 use std::path::Path;
 use std::{iter, str};
 
+use crate::error::CryptoError;
+
 #[derive(Debug, Clone)]
 pub struct Bytes(Vec<u8>);
 
@@ -79,7 +81,6 @@ impl Bytes {
                 content.push_str(&ip)
             }
         }
-        dbg!(&content);
         Bytes::from_base64(&content)
     }
 
@@ -118,18 +119,18 @@ impl IntoIterator for Bytes {
     }
 }
 
-pub fn break_single_char_xor(bytes: &Bytes) -> Bytes {
+pub fn break_single_char_xor(bytes: &[u8]) -> Vec<u8> {
     let mut counts: HashMap<u8, u8> = HashMap::new();
     let mut max_count = (0, 0);
     for byte in bytes.clone().into_iter() {
-        let new_count = counts.entry(byte).or_default();
+        let new_count = counts.entry(*byte).or_default();
         *new_count += 1;
         if new_count > &mut max_count.0 {
-            max_count = (*new_count, byte);
+            max_count = (*new_count, *byte);
         }
     }
-    let mask = Bytes::from_byte(' ' as u8).xor(&Bytes::from_byte(max_count.1));
-    dbg!(bytes.xor(&mask).display());
+    let mask = xor(&[' ' as u8], &[max_count.1]);
+    // Bytes::from_byte(' ' as u8).xor(&Bytes::from_byte(max_count.1));
     mask
 }
 
@@ -164,7 +165,7 @@ pub fn pad_to(bytes: &[u8], size: usize) -> Vec<u8> {
     let mut res = bytes.to_vec();
     let len = bytes.len();
     if len < size {
-        res.extend::<Vec<u8>>(iter::repeat(b'\x04').take(size - len).collect());
+        res.extend::<Vec<u8>>(iter::repeat((size - len) as u8).take(size - len).collect());
     }
     res
 }
@@ -175,9 +176,43 @@ pub fn random_bytes_range(min: usize, max: usize) -> Vec<u8> {
     bytes[0..num_bytes].to_vec()
 }
 
+pub fn random_index(min: usize, max: usize) -> usize {
+    rand::thread_rng().gen_range(min..max + 1)
+}
+
+pub fn strip_padding_bytes(pt: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    let mut truncation_point = pt.len() - 1;
+    let mut padding_val = None;
+    while truncation_point > 0 {
+        let char = pt[truncation_point];
+        if char > 19 {
+            break;
+        }
+        truncation_point -= 1;
+        if let Some(val) = padding_val {
+            if val != char {
+                return Err(CryptoError(
+                    "Invalid padding detected, padding inconsistent".into(),
+                ));
+            }
+        } else {
+            padding_val = Some(char);
+        }
+    }
+    let num_padding_bytes = pt.len() - truncation_point - 1;
+    if let Some(val) = padding_val {
+        if val != num_padding_bytes as u8 {
+            return Err(CryptoError(
+                "Invalid padding detected, incorrect number of padding bytes".into(),
+            ));
+        }
+    }
+    Ok(pt[0..truncation_point + 1].to_vec())
+}
+
 pub fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
     a.iter()
-        .zip(b.iter().cycle().take(b.len()))
+        .zip(b.iter().cycle().take(a.len()))
         .map(|(&x1, &x2)| x1 ^ x2)
         .collect()
 }
@@ -185,6 +220,35 @@ pub fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
 pub fn from_base64(input: &str) -> Vec<u8> {
     general_purpose::STANDARD.decode(input).unwrap()
 }
-pub fn display(input: &[u8]) -> Option<String> {
-    Some(String::from_utf8_lossy(input).into())
+
+pub fn from_hex(hex: &str) -> Vec<u8> {
+    hex::decode(hex).unwrap()
+}
+
+pub fn display(input: &[u8]) -> String {
+    String::from_utf8_lossy(input).into()
+}
+
+pub fn from_base64_file<P>(filename: P) -> Vec<u8>
+where
+    P: AsRef<Path>,
+{
+    let mut content = String::new();
+    let lines = read_lines(filename).unwrap();
+    for line in lines {
+        if let Ok(ip) = line {
+            content.push_str(&ip)
+        }
+    }
+    from_base64(&content)
+}
+
+// Construct another block by collecting every frequency bytes
+pub fn transpose(bytes: &[u8], frequency: usize, start: usize) -> Vec<u8> {
+    bytes
+        .iter()
+        .skip(start)
+        .step_by(frequency)
+        .cloned()
+        .collect()
 }
