@@ -5,7 +5,7 @@ mod third_set {
     use crate::{
         aes::{aes_decrypt, aes_encrypt, ctr_decrypt, ctr_encrypt},
         constants::PLAINTEXTS,
-        twister::MersenneTwister,
+        twister::{temper, untemper, MersenneTwister},
         utils::{
             break_single_char_xor, display, from_base64, random_index, read_lines,
             strip_padding_bytes, transpose, xor, Bytes,
@@ -15,14 +15,39 @@ mod third_set {
     #[test]
     pub fn twister() {
         let mut twister = MersenneTwister::seed(32);
-        let mut num = twister.extract_number();
-        num = twister.extract_number();
-        num = twister.extract_number();
-        num = twister.extract_number();
-        num = twister.extract_number();
-        num = twister.extract_number();
-        num = twister.extract_number();
+        let num = twister.extract_number();
         dbg!(num);
+    }
+
+    #[test]
+    pub fn test_untemper() {
+        //let test_val = 0b101010aa11101010101011101010101011u32;
+        let test_val = 1872604882;
+        let res = untemper(temper(test_val));
+        assert!(res == test_val);
+    }
+
+    #[test]
+    pub fn clone_rng() {
+        let mut twister = MersenneTwister::seed(32);
+        let mut outputs = vec![];
+        for _ in 0..624 {
+            outputs.push(twister.extract_number());
+        }
+        let mut state_vec = outputs.clone();
+        for i in 0..624 {
+            state_vec[i] = untemper(state_vec[i]);
+        }
+        let mut state = [0; 624];
+        state.clone_from_slice(&state_vec);
+        dbg!(state[1]);
+        let mut new_twister = MersenneTwister { state, index: 0 };
+        twister = MersenneTwister::seed(32);
+        for _ in 0..624 {
+            let first = new_twister.extract_number();
+            let second = twister.extract_number();
+            assert!(first == second);
+        }
     }
 
     #[test]
@@ -95,7 +120,6 @@ mod third_set {
             }
             dbg!(max_count);
         }
-
         let texts = PLAINTEXTS.map(|pt| ctr_encrypt(&from_base64(pt), &CONSTANT_KEY));
         index_histogram(&texts, 0);
 

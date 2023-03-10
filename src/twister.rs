@@ -6,7 +6,6 @@ const M: u32 = 397;
 const R: u32 = 31;
 const A: u32 = 0x9908_B0DF;
 const U: u32 = 11;
-const D: u32 = 0xFFFF_FFFF;
 const S: u32 = 7;
 const F: u32 = 1812433253;
 const B: u32 = 0x9D2C_5680;
@@ -18,8 +17,8 @@ const UPPER_MASK: u32 = !LOWER_MASK;
 
 #[derive(Debug)]
 pub struct MersenneTwister {
-    state: [u32; N],
-    index: usize,
+    pub state: [u32; N],
+    pub index: usize,
 }
 
 impl MersenneTwister {
@@ -55,12 +54,13 @@ impl MersenneTwister {
             self.state[i] = self.state[(i + (M as usize)) % N] ^ x_a;
         }
         self.index = 0;
+        dbg!(self.state[1]);
     }
 }
 
 pub fn temper(num: u32) -> u32 {
     let mut y = num;
-    y = y ^ ((y >> U) & D);
+    y = y ^ (y >> U);
     y = y ^ ((y << S) & B);
     y = y ^ ((y << T) & C);
     y = y ^ (y >> L);
@@ -69,5 +69,21 @@ pub fn temper(num: u32) -> u32 {
 
 pub fn untemper(num: u32) -> u32 {
     let mut y = num;
+
+    y = (y & (!0 << 14)) ^ ((y >> 18) ^ y & (!0 >> 18));
+
+    y = (y ^ (y << 15 & C)) | (y & (!0 >> 17));
+
+    let mut temp = y & (!0 >> 25);
+    for i in 1..5 {
+        temp = (y ^ ((temp << 7) & B)) & (0b1111111u32 << i * 7) ^ temp;
+    }
+    y = temp;
+
+    let mut temp = y & (!0 << 21);
+    temp = ((y ^ (temp >> 11)) & (0b11111111111u32 << 10)) | temp;
+    temp = ((y ^ (temp >> 11)) & (0b1111111111u32)) | temp;
+    y = temp;
+
     y
 }
